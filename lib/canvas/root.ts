@@ -19,12 +19,14 @@ export class Scene {
       const entity = this.entities.find((entity) =>
         entity.mayHit(this.getMousePos(event))
       );
+      if (this.overlay == null) this.overlay = new Overlay();
       if (entity) {
-        if (event.ctrlKey && this.overlay && !this.overlay.some(entity)) {
+        if (event.ctrlKey) {
           this.overlay.append(entity);
-        } else {
-          this.overlay = new Overlay(entity);
+          this.overlay.activate();
+          return;
         }
+        if (!this.overlay?.some(entity)) this.overlay = new Overlay(entity);
         this.overlay.activate();
         return;
       }
