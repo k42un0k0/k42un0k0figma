@@ -11,9 +11,10 @@ export default function Home() {
     if (typeof window == "undefined") return;
     if (ref.current == null) return;
     const scene = new Scene(ref.current);
-    scene.append(new Rect(scene, 0, 0, 100, 100, 50));
-    scene.append(new Rect(scene, 100, 100, 100, 100, 5));
+    scene.append(new Rect(scene, 0, 0, 100, 100, 20));
+    scene.append(new Rect(scene, 100, 100, 100, 100, 0));
+    scene.append(new Rect(scene, 200,200, 100, 100, 0));
     scene.draw();
   });
-  return <canvas ref={ref} />;
+  return <canvas ref={ref}  width="500" height="500"/>;
 }

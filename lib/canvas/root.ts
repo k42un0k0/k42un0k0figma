@@ -1,12 +1,12 @@
-import { Entity } from "./entity";
+import { Entity, Rect } from "./entity";
 import { onGuard } from "./utils";
 
-type EventType = "select";
 export class Scene {
   constructor(private _canvas: HTMLCanvasElement) {
     this._canvas.addEventListener("mouseup", (e) => this.on("mouseup", e));
     this._canvas.addEventListener("mousemove", (e) => this.on("mousemove", e));
     this._canvas.addEventListener("mousedown", (e) => this.on("mousedown", e));
+    this._canvas.addEventListener("contextmenu",(e)=>{e.preventDefault()})
   }
   get ctx(): CanvasRenderingContext2D {
     return this._canvas.getContext("2d");
@@ -19,18 +19,18 @@ export class Scene {
       const entity = this.entities.find((entity) =>
         entity.mayHit(this.getMousePos(event))
       );
-      if (this.overlay == null) this.overlay = new Overlay();
+      if (this.overlay == null) this.overlay = new Overlay(this);
       if (entity) {
         if (event.ctrlKey) {
           this.overlay.append(entity);
-          this.overlay.activate();
+          this.overlay.grab();
           return;
         }
-        if (!this.overlay?.some(entity)) this.overlay = new Overlay(entity);
-        this.overlay.activate();
+        if (!this.overlay?.some(entity)) this.overlay = new Overlay(this,entity);
+        this.overlay.grab();
         return;
       }
-      this.overlay?.deactivate();
+      this.overlay?.degrab();
       this.overlay = undefined;
     }
     if (onGuard("mousemove", tuple)) {
@@ -49,7 +49,7 @@ export class Scene {
     if (onGuard("mouseup", tuple)) {
       const [type, event] = tuple;
       this.overlay?.on(type, event);
-      this.overlay?.deactivate();
+      this.overlay?.degrab();
     }
   }
   entities: Entity[] = [];
@@ -70,13 +70,16 @@ export class Scene {
     this.entities.forEach((entity) => {
       entity.draw();
     });
+    this.overlay?.draw()
     requestAnimationFrame(this.draw.bind(this));
   }
 }
 
 class Overlay {
+  grabing:boolean=false
   entities: Entity[] = [];
-  constructor(...entities: Entity[]) {
+  prevMousePos?: { x: number; y: number };
+  constructor(private _scene,...entities: Entity[]) {
     this.entities = entities;
   }
   some(entity: Entity): boolean {
@@ -85,20 +88,42 @@ class Overlay {
   append(entity: Entity) {
     this.entities.push(entity);
   }
-  deactivate() {
-    this.entities.forEach((entity) => (entity.selected = false));
+  draw(){
+    if(this.entities.length==1 && this.entities[0] instanceof Rect){
+      const rect = this.entities[0]
+      this._scene.ctx.rect(rect.x,rect.y,rect.width,rect.height)
+      this._scene.ctx.stroke()
+    }
+    let minx=1000000,miny=100000,maxx=0,maxy=0;
+    this.entities.forEach((entity:Rect)=>{
+      minx=Math.min(minx, entity.x)
+      miny=Math.min(miny, entity.y)
+      maxx=Math.max(maxx, entity.x+entity.width)
+      maxy=Math.max(maxy, entity.y+entity.height)
+    })
+    this._scene.ctx.rect(minx,miny,maxx-minx,maxy-miny)
+    this._scene.ctx.stroke()
   }
-  activate() {
-    this.entities.forEach((entity) => {
-      entity.selected = true;
-    });
+  degrab() {
+    this.grabing=false
+    this.prevMousePos=undefined
+  }
+  grab() {
+    this.grabing=true
   }
   on<T extends keyof HTMLElementEventMap>(
-    type: T,
-    event: HTMLElementEventMap[T]
+   ...tuple:[ type: T,
+    event: HTMLElementEventMap[T]]
   ) {
-    this.entities.forEach((entity) => {
-      entity.on(type, event);
-    });
+    if (onGuard("mousemove", tuple) && this.grabing) {
+      const [type, event] = tuple;
+      const newMousePos = this._scene.getMousePos(event);
+      const distance ={x: newMousePos.x - (this.prevMousePos?.x ?? newMousePos.x),
+      y: newMousePos.y - (this.prevMousePos?.y ?? newMousePos.y)}
+      this.prevMousePos = newMousePos;
+      this.entities.forEach((entity) => {
+        entity.move(distance);
+      });
+    }
   }
 }

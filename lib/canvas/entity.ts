@@ -11,6 +11,9 @@ export class Entity {
   mayHit(pos: { x: number; y: number }): boolean {
     return false;
   }
+  move(distance:{x:number,y:number}){
+    
+  }
 }
 
 class Group extends Entity {
@@ -19,18 +22,18 @@ class Group extends Entity {
 export class Rect extends Entity {
   constructor(
     scene: Scene,
-    private x: number,
-    private y: number,
-    private width: number,
-    private height: number,
-    private radius: number
+    public x: number,
+    public y: number,
+    public width: number,
+    public height: number,
+    public radius: number
   ) {
     super(scene);
   }
   draw() {
     this._scene.ctx.save();
     this._scene.ctx.strokeStyle = "rgb(255, 0, 0)";
-    this._scene.ctx.fillStyle = "rgba(255, 255, 0, .5)";
+    this._scene.ctx.fillStyle = "rgba(0, 255, 0, 1)";
     this.roundRect(
       this.x,
       this.y,
@@ -42,21 +45,7 @@ export class Rect extends Entity {
     );
     this._scene.ctx.restore();
   }
-  prevMousePos?: { x: number; y: number };
-  on<T extends keyof HTMLElementEventMap>(
-    ...tuple: [type: T, event: HTMLElementEventMap[T]]
-  ) {
-    if (onGuard("mousemove", tuple) && this.selected) {
-      const [type, event] = tuple;
-      const newMousePos = this._scene.getMousePos(event);
-      this.x += newMousePos.x - (this.prevMousePos?.x ?? newMousePos.x);
-      this.y += newMousePos.y - (this.prevMousePos?.y ?? newMousePos.y);
-      this.prevMousePos = newMousePos;
-    }
-    if (onGuard("mouseup", tuple) && this.selected) {
-      this.prevMousePos = undefined;
-    }
-  }
+ 
   mayHit(pos: { x: number; y: number }) {
     return (
       // 縦長長方形
@@ -86,6 +75,10 @@ export class Rect extends Entity {
         Math.pow(this.y + this.height - this.radius - pos.y, 2) <=
         Math.pow(this.radius, 2)
     );
+  }
+  move(distance:{x:number,y:number}){
+    this.x+=distance.x;
+    this.y+=distance.y;
   }
   private roundRect(
     x: number,
