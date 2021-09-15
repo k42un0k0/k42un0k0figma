@@ -21,7 +21,7 @@ export class Scene {
       );
       if (this.overlay == null) this.overlay = new Overlay(this);
       if (entity) {
-        if (event.ctrlKey) {
+        if (event.ctrlKey && !this.overlay?.some(entity)) {
           this.overlay.append(entity);
           this.overlay.grab();
           return;
@@ -89,18 +89,15 @@ class Overlay {
     this.entities.push(entity);
   }
   draw(){
-    if(this.entities.length==1 && this.entities[0] instanceof Rect){
-      const rect = this.entities[0]
-      this._scene.ctx.rect(rect.x,rect.y,rect.width,rect.height)
-      this._scene.ctx.stroke()
-    }
     let minx=1000000,miny=100000,maxx=0,maxy=0;
+
     this.entities.forEach((entity:Rect)=>{
       minx=Math.min(minx, entity.x)
       miny=Math.min(miny, entity.y)
       maxx=Math.max(maxx, entity.x+entity.width)
       maxy=Math.max(maxy, entity.y+entity.height)
     })
+    this._scene.ctx.beginPath()
     this._scene.ctx.rect(minx,miny,maxx-minx,maxy-miny)
     this._scene.ctx.stroke()
   }
