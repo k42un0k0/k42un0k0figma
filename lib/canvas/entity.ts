@@ -1,18 +1,46 @@
 import { Scene } from "./root";
 import { onGuard } from "./utils";
 
-export class Entity {
+interface TickTrait {
+  tick(): void;
+}
+
+interface DrawTrait {
+  draw(): void;
+}
+interface EffectTrait {
+  effect(): void;
+}
+
+interface OnTrait {
+  on<T extends keyof HTMLElementEventMap>(type: T, e: HTMLElementEventMap[T]);
+}
+
+interface Lifecycle extends TickTrait, DrawTrait, EffectTrait {}
+
+export class Entity implements Lifecycle, OnTrait {
   visible: boolean;
+  draggable: boolean = false;
+  hoverable: boolean = true;
   selected: boolean = false;
   constructor(protected _scene: Scene) {}
+  effect(): void {}
   draw() {}
   /** sceneに対する絶対位置で持つ */
   on<T extends keyof HTMLElementEventMap>(type: T, e: HTMLElementEventMap[T]) {}
   mayHit(pos: { x: number; y: number }): boolean {
     return false;
   }
-  move(distance:{x:number,y:number}){
-    
+  move(distance: { x: number; y: number }) {}
+  tick() {}
+  click() {
+    console.log("click", this);
+  }
+  hoverStart() {
+    console.log("start", this);
+  }
+  hoverEnd() {
+    console.log("end", this);
   }
 }
 
@@ -45,7 +73,7 @@ export class Rect extends Entity {
     );
     this._scene.ctx.restore();
   }
- 
+
   mayHit(pos: { x: number; y: number }) {
     return (
       // 縦長長方形
@@ -76,9 +104,9 @@ export class Rect extends Entity {
         Math.pow(this.radius, 2)
     );
   }
-  move(distance:{x:number,y:number}){
-    this.x+=distance.x;
-    this.y+=distance.y;
+  move(distance: { x: number; y: number }) {
+    this.x += distance.x;
+    this.y += distance.y;
   }
   private roundRect(
     x: number,
