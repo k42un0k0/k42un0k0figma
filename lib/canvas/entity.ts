@@ -23,6 +23,7 @@ export class Entity implements Lifecycle, OnTrait {
   draggable: boolean = false;
   hoverable: boolean = true;
   selected: boolean = false;
+  entities: Entity[] = [];
   constructor(protected _scene: Scene) {}
   effect(): void {}
   draw() {}

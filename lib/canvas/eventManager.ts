@@ -1,7 +1,10 @@
 import { Entity } from "./entity";
+import { Scene } from "./root";
+import { onGuard } from "./utils";
 
 /** mousemove時にhitしたentityを計算する */
 export class HoverManager {
+  constructor(private _scene: Scene) {}
   cycleState: "doing" | "stop" = "stop";
   prevEntities: Entity[] = [];
   nextEntities: Entity[] = [];
@@ -38,10 +41,32 @@ export class HoverManager {
   finishCycle() {
     this.cycleState = "stop";
   }
+  on<T extends keyof HTMLElementEventMap>(
+    ...tuple: [type: T, event: HTMLElementEventMap[T]]
+  ) {
+    if (onGuard("mousemove", tuple)) {
+      const [type, event] = tuple;
+      this.startCycle();
+      const entities = this._scene.findHitEntities(event);
+      entities.forEach((entity) => {
+        if (entity.hoverable) this.append(entity);
+      });
+      const newEntities = this.newEntities();
+      const removedEntities = this.removedEntities();
+      newEntities.forEach((e) => {
+        e.hoverStart();
+      });
+      removedEntities.forEach((e) => {
+        e.hoverEnd();
+      });
+      this.finishCycle();
+    }
+  }
 }
 
 /** mousedown時にhitしたentityをひとつだけ持っておく */
 export class DragManager {
+  constructor(private _scene: Scene) {}
   entity?: Entity;
   prevPos?: { x: number; y: number };
   dragStart(entity: Entity, pos: { x: number; y: number }): void {
@@ -64,31 +89,46 @@ export class DragManager {
       ];
     }
   }
-  endDrag() {
+  dragEnd() {
     this.prevPos = undefined;
     this.entity = undefined;
+  }
+  on<T extends keyof HTMLElementEventMap>(
+    ...tuple: [type: T, event: HTMLElementEventMap[T]]
+  ) {
+    if (onGuard("mousedown", tuple)) {
+      const [type, event] = tuple;
+      const entity = this._scene.findHitEntity(event);
+      if (entity != null) {
+        this.dragStart(entity, this._scene.getMousePos(event));
+      }
+    }
+    if (onGuard("mousemove", tuple)) {
+      const [type, event] = tuple;
+      const [dragingEntity, distance] =
+        this.dragingEntity(this._scene.getMousePos(event)) ?? [];
+    }
+    if (onGuard("mouseup", tuple)) {
+      this.dragEnd();
+    }
   }
 }
 
 /** mousedownでhitしたentityをぶちこんで、mouseupでもhitしたentityをぶちこみ同じものをclickしたとみなす？ */
 export class ClickManager {
+  clickState: "mousedown" | "drag" | "end";
+  constructor(private _scene: Scene) {}
   mouseDownEntities: Entity[] = [];
   mouseUpEntities: Entity[] = [];
 
-  mouseDownTime = 0;
-  mouseUpTime = 100000;
-  clickDelay = 500;
   mouseDownEntity(entity: Entity) {
-    this.mouseDownTime = Date.now();
     this.mouseDownEntities.push(entity);
   }
   mouseUpEntity(entity: Entity) {
-    this.mouseUpTime = Date.now();
     this.mouseUpEntities.push(entity);
   }
   clickedEntity(): Entity[] {
     const result: Entity[] = [];
-    if (this.mouseUpTime - this.mouseDownTime > this.clickDelay) return result;
     this.mouseDownEntities.forEach((dEntity) => {
       const find = this.mouseUpEntities.some((uEntity) => dEntity === uEntity);
       if (find) result.push(dEntity);
@@ -98,7 +138,36 @@ export class ClickManager {
   clear() {
     this.mouseDownEntities = [];
     this.mouseUpEntities = [];
-    this.mouseDownTime = 0;
-    this.mouseUpTime = 100000;
+    this.clickState = "end";
+  }
+  on<T extends keyof HTMLElementEventMap>(
+    ...tuple: [type: T, event: HTMLElementEventMap[T]]
+  ) {
+    if (onGuard("mousedown", tuple)) {
+      const [type, event] = tuple;
+      const entity = this._scene.findHitEntity(event);
+      if (entity != null) {
+        this.clickState = "mousedown";
+        this.mouseDownEntity(entity);
+      }
+    }
+    if (onGuard("mousemove", tuple)) {
+      const [type, event] = tuple;
+      if (this.clickState === "mousedown") {
+        this.clickState = "drag";
+      }
+    }
+    if (onGuard("mouseup", tuple)) {
+      if (this.clickState === "mousedown") {
+        const [type, event] = tuple;
+        const entity = this._scene.findHitEntity(event);
+        this.mouseUpEntity(entity);
+        const clickedEntity = this.clickedEntity();
+        clickedEntity.forEach((entity) => {
+          entity.click();
+        });
+      }
+      this.clear();
+    }
   }
 }

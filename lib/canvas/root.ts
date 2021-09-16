@@ -3,9 +3,9 @@ import { Entity, Rect } from "./entity";
 import { onGuard } from "./utils";
 
 export class Scene {
-  hoverManager = new HoverManager();
-  clickManager = new ClickManager();
-  dragManager = new DragManager();
+  hoverManager = new HoverManager(this);
+  clickManager = new ClickManager(this);
+  dragManager = new DragManager(this);
   overlayManager = new OverlayManager(this);
   constructor(private _canvas: HTMLCanvasElement) {
     this._canvas.addEventListener("mouseup", (e) => this.on("mouseup", e));
@@ -18,53 +18,40 @@ export class Scene {
   get ctx(): CanvasRenderingContext2D {
     return this._canvas.getContext("2d");
   }
+  findHitEntities(e: MouseEvent) {
+    const result: Entity[] = [];
+    const recursive = (entities: Entity[]) => {
+      entities.forEach((entity) => {
+        if (entity.mayHit(this.getMousePos(e))) {
+          result.push(entity);
+          recursive(entity.entities);
+        }
+      });
+    };
+    recursive(this.entities);
+    return result;
+  }
+  findHitEntity(e: MouseEvent) {
+    return this.entities.find((entity) => entity.mayHit(this.getMousePos(e)));
+  }
   on<T extends keyof HTMLElementEventMap>(
     ...tuple: [type: T, event: HTMLElementEventMap[T]]
   ) {
+    this.clickManager.on(...tuple);
+    this.hoverManager.on(...tuple);
+    this.dragManager.on(...tuple);
     if (onGuard("mousedown", tuple)) {
       const [type, event] = tuple;
-      const entity = this.entities.find((entity) =>
-        entity.mayHit(this.getMousePos(event))
-      );
+      const entity = this.findHitEntity(event);
       if (entity != null) {
-        this.dragManager.dragStart(entity, this.getMousePos(event));
-        this.clickManager.mouseDownEntity(entity);
         this.overlayManager.mouseDown(entity, event.ctrlKey);
       }
     }
     if (onGuard("mousemove", tuple)) {
       const [type, event] = tuple;
-      this.hoverManager.startCycle();
-      this.entities.forEach((entity) => {
-        if (entity.mayHit(this.getMousePos(event))) {
-          this.hoverManager.append(entity);
-        }
-      });
       this.overlayManager.mouseMove(this.getMousePos(event));
-      const [dragingEntity, distance] =
-        this.dragManager.dragingEntity(this.getMousePos(event)) ?? [];
-      const newEntities = this.hoverManager.newEntities();
-      const removedEntities = this.hoverManager.removedEntities();
-      newEntities.forEach((e) => {
-        e.hoverStart();
-      });
-      removedEntities.forEach((e) => {
-        e.hoverEnd();
-      });
-      this.hoverManager.finishCycle();
     }
     if (onGuard("mouseup", tuple)) {
-      const [type, event] = tuple;
-      const entity = this.entities.find((entity) =>
-        entity.mayHit(this.getMousePos(event))
-      );
-      this.dragManager.endDrag();
-      this.clickManager.mouseUpEntity(entity);
-      const clickedEntity = this.clickManager.clickedEntity();
-      clickedEntity.forEach((entity) => {
-        entity.click();
-      });
-      this.clickManager.clear();
       this.overlayManager.mouseUp();
     }
   }
